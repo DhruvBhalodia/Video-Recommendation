@@ -18,7 +18,7 @@ An AI-powered video recommendation system that suggests videos based on user pre
 - React.js, Tailwind CSS  
 
 ### **Backend:**  
-- Node.js + Express **(or Spring Boot, choose one)**  
+- Node.js + Express 
 - MongoDB / MySQL (Database)  
 
 ### **Machine Learning Microservice:**  
