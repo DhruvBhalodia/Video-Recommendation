@@ -33,3 +33,50 @@ An AI-powered video recommendation system that suggests videos based on user pre
 ```bash
 git clone https://github.com/your-username/video-recommendation-app.git
 cd video-recommendation-app
+```
+
+### 2️⃣ **Backend Setup**  
+```bash
+cd backend
+npm install  # If using Node.js
+# OR
+mvn clean install  # If using Spring Boot
+```
+
+### 3️⃣ **Frontend Setup**  
+```bash
+cd frontend
+npm install
+npm start
+```
+
+### 4️⃣ **ML Recommendation Service Setup**  
+```bash
+cd ml-service
+pip install -r requirements.txt
+python app.py
+```
+
+---
+
+## 📜 API Endpoints  
+
+### **1️⃣ Backend (Node.js/Spring Boot)**  
+| Endpoint               | Method | Description |
+|------------------------|--------|-------------|
+| `/signup`             | POST   | Register a new user |
+| `/login`              | POST   | Authenticate user |
+| `/videos`             | GET    | Fetch all videos |
+| `/recommendations/:userId` | GET | Fetch personalized recommendations |
+
+### **2️⃣ ML Microservice (Python)**  
+| Endpoint               | Method | Description |
+|------------------------|--------|-------------|
+| `/recommend`          | POST   | Generates video recommendations |
+
+---
+
+## 📜 License  
+This project is licensed under the **MIT License**.  
+
+---
