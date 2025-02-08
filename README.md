@@ -38,9 +38,7 @@ cd video-recommendation-app
 ### 2️⃣ **Backend Setup**  
 ```bash
 cd backend
-npm install  # If using Node.js
-# OR
-mvn clean install  # If using Spring Boot
+npm install
 ```
 
 ### 3️⃣ **Frontend Setup**  
