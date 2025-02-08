@@ -8,7 +8,7 @@ An AI-powered video recommendation system that suggests videos based on user pre
 ✅ Personalized video recommendations using ML 🤖  
 ✅ User authentication & watch history tracking 🔐  
 ✅ Interactive UI with **React.js + Tailwind CSS** 🎨  
-✅ RESTful APIs with **Node.js/Express or Spring Boot** ⚡  
+✅ RESTful APIs with **Node.js/Express** ⚡  
 ✅ **Microservices-based architecture** (Backend & ML Recommendation Engine)  
 
 ---
