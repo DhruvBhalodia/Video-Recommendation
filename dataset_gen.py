@@ -6,12 +6,14 @@ import random
 
 # Initialize Faker and set seeds for reproducibility
 fake = Faker()
+np.random.seed(42)
+random.seed(42)
 
 # Constants
 NUM_USERS = 1000
 NUM_CHANNELS = 50
 VIDEOS_PER_CHANNEL = 100
-MAX_INTERACTIONS_PER_USER = 200
+MAX_INTERACTIONS_PER_USER = 200  # Maximum loops; each loop yields 2 interactions => max interactions ~ 400
 
 # Updated categories and tags
 CATEGORIES = ["Anime", "Tech", "Gaming", "Music", "Education", "Sports", "Comedy", "Cooking", "Fitness", "News"]
@@ -96,34 +98,29 @@ TAGS = {
 }
 
 # Parameterized probabilities and thresholds
-PREFERRED_CHANNEL_PROB = 0.8   # 80% interactions come from followed channels
+PREFERRED_CHANNEL_PROB = 0.8   # For interactions based on followed channels
 TRENDING_PROB = 0.05           # 5% of videos are trending
 LIKE_THRESHOLD = 0.95          # Fully watched videos (>=95%) are liked
 MIN_WATCH_FOR_DISLIKE = 0.1    # <10% watch indicates likely dislike
 
 # Helper function: Generate a timestamp with recent bias
 def get_weighted_ts(days=365):
-    """
-    Generate a datetime object between now and 'days' ago.
-    """
+    """Generate a datetime object between now and 'days' ago."""
     return fake.date_time_between(start_date=f'-{days}d', end_date='now')
 
 ###############################
-# 1. Generate Users
+# 1. Generate Users with 3 Followed Categories
 ###############################
 users = []
 for _ in range(NUM_USERS):
+    # Each user follows exactly 3 unique categories
+    followed_categories = list(np.random.choice(CATEGORIES, size=3, replace=False))
+    followed_categories_str = ",".join(followed_categories)
+    
     user = {
         "user_id": fake.uuid4(),
-        "preferred_category": np.random.choice(
-            CATEGORIES, 
-            p=np.random.permutation(probabilities)
-        ),
+        "followed_categories": followed_categories_str,
         "preferred_length": np.random.choice(["short", "medium", "long"], p=[0.4, 0.5, 0.1]),
-        "disliked_category": np.random.choice(
-            CATEGORIES, 
-            p=np.random.permutation(p2)
-        ),
         "attention_span": np.clip(np.random.normal(loc=0.7, scale=0.2), 0, 1)
     }
     users.append(user)
@@ -153,7 +150,7 @@ current_date = datetime.now()
 
 for channel in channels:
     for _ in range(VIDEOS_PER_CHANNEL):
-        # Determine video category: based on channel's consistency
+        # Determine video category: 80% chance to use channel's primary category; otherwise random.
         if random.random() < channel["consistency"]:
             category = channel["primary_category"]
         else:
@@ -172,96 +169,123 @@ for channel in channels:
             "views": 0,
             "is_trending": False
         }
-        
         # Set trending videos based on TRENDING_PROB
         if random.random() < TRENDING_PROB:
             video["views"] = np.random.randint(50000, 100000)
             video["is_trending"] = True
         else:
             video["views"] = np.random.randint(100, 10000)
-        
         videos.append(video)
 videos_df = pd.DataFrame(videos)
 print("Videos generated.")
 
 ###############################
-# 4. Generate Interactions
+# 4. Generate Interactions (Two Interactions per Loop)
 ###############################
-interactions = []
+# Fixed probabilities for followed categories (for the second type of interaction)
+followed_probs = [0.5, 0.3, 0.2]
 
+interactions = []
+# For each user, set a minimum of 50 iterations (yielding at least 100 interactions)
 for user in users:
-    preferred_category = user["preferred_category"]
-    preferred_length = user["preferred_length"]
-    disliked_category = user["disliked_category"]
+    # Get the followed categories for this user (list of 3)
+    followed_categories = user["followed_categories"].split(",")
     
-    # Sample followed channels based on user's preferred category
-    matched_channels = channels_df[channels_df["primary_category"] == preferred_category]
-    sample_size = min(3, len(matched_channels))
-    followed_channels = (
-        matched_channels.sample(sample_size)["channel_id"].tolist()
-        if sample_size > 0 else []
-    )
+    # Sample followed channels for the user based on each followed category separately:
+    # For simplicity, we collect channels for each followed category in a dictionary.
+    channels_by_cat = {}
+    for cat in followed_categories:
+        cat_channels = channels_df[channels_df["primary_category"] == cat]
+        # If available, sample up to 3 channels per category; else, empty list
+        sample_size = min(3, len(cat_channels))
+        channels_by_cat[cat] = (
+            cat_channels.sample(sample_size)["channel_id"].tolist() if sample_size > 0 else []
+        )
     
-    num_interactions = np.random.randint(50, MAX_INTERACTIONS_PER_USER)
+    # Determine the number of loop iterations (each loop yields 2 interactions)
+    num_loops = np.random.randint(50, MAX_INTERACTIONS_PER_USER)
     
-    for _ in range(num_interactions):
+    for _ in range(num_loops):
+        # --- Interaction 1: Based on Followed Channels ---
+        # Randomly choose one followed category for channel-based interaction
+        chosen_cat_for_channel = np.random.choice(followed_categories)
+        followed_channels = channels_by_cat.get(chosen_cat_for_channel, [])
+        
         if random.random() < PREFERRED_CHANNEL_PROB and followed_channels:
             candidate_videos = videos_df[
                 (videos_df["channel_id"].isin(followed_channels)) &
-                (videos_df["category"] != disliked_category)
+                (videos_df["category"] == chosen_cat_for_channel)
             ]
             if candidate_videos.empty:
-                video = videos_df.sample(1).iloc[0]
+                video1 = videos_df.sample(1).iloc[0]
             else:
-                video = candidate_videos.sample(1).iloc[0]
+                video1 = candidate_videos.sample(1).iloc[0]
         else:
-            if random.random() < 0.95:
-                candidate_videos = videos_df[videos_df["category"] != disliked_category]
-            else:
-                candidate_videos = videos_df[
-                    (videos_df["category"] == disliked_category) &
-                    (videos_df["upload_date"] < (current_date - timedelta(days=30)))
-                ]
+            # Fallback: select a video not in the chosen disliked category (if any)
+            candidate_videos = videos_df[videos_df["category"] == chosen_cat_for_channel]
             if candidate_videos.empty:
-                video = videos_df.sample(1).iloc[0]
+                video1 = videos_df.sample(1).iloc[0]
             else:
-                video = candidate_videos.sample(1).iloc[0]
+                video1 = candidate_videos.sample(1).iloc[0]
         
-        # Calculate watch percentage based on user's attention span and video length
         base_watch = user["attention_span"]
-        if video["length"] == preferred_length:
-            raw_watch_pct = base_watch + np.random.normal(0.2, 0.1)
+        # For simplicity, assume watch percentage calculation similar to before
+        if video1["length"] == np.random.choice(["short", "medium", "long"], p=[0.4, 0.5, 0.1]):
+            raw_watch_pct1 = base_watch + np.random.normal(0.2, 0.1)
         else:
-            raw_watch_pct = base_watch - np.random.normal(0.3, 0.15)
+            raw_watch_pct1 = base_watch - np.random.normal(0.3, 0.15)
+        watch_pct1 = np.clip(raw_watch_pct1, 0, 1)
         
-        # Ensure watch percentage is always between 0 and 1
-        watch_pct = np.clip(raw_watch_pct, 0, 1)
-        
-        # Generate interaction record
-        interaction = {
+        interaction1 = {
             "user_id": user["user_id"],
-            "video_id": video["video_id"],
-            "watch_percentage": watch_pct,
-            "liked": 1 if watch_pct >= LIKE_THRESHOLD else (1 if watch_pct > 0.8 and random.random() < 0.3 else 0),
-            "disliked": 1 if watch_pct < MIN_WATCH_FOR_DISLIKE and random.random() < 0.7 else 0,
-            "timestamp": get_weighted_ts(90 if video["category"] != disliked_category else 180)
+            "video_id": video1["video_id"],
+            "watch_percentage": watch_pct1,
+            "liked": 1 if watch_pct1 >= LIKE_THRESHOLD else (1 if watch_pct1 > 0.8 and random.random() < 0.3 else 0),
+            "disliked": 1 if watch_pct1 < MIN_WATCH_FOR_DISLIKE and random.random() < 0.7 else 0,
+            "timestamp": get_weighted_ts(90)
         }
+        if watch_pct1 >= LIKE_THRESHOLD:
+            interaction1["liked"] = 1
+            interaction1["disliked"] = 0
         
-        # Fully watched videos are marked as liked and not disliked.
-        if watch_pct >= LIKE_THRESHOLD:
-            interaction["liked"] = 1
-            interaction["disliked"] = 0
+        interactions.append(interaction1)
         
-        interactions.append(interaction)
+        # --- Interaction 2: Based on Chosen Followed Category (using fixed probabilities) ---
+        chosen_cat = np.random.choice(followed_categories, p=followed_probs)
+        candidate_videos = videos_df[videos_df["category"] == chosen_cat]
+        if candidate_videos.empty:
+            video2 = videos_df.sample(1).iloc[0]
+        else:
+            video2 = candidate_videos.sample(1).iloc[0]
+        
+        if video2["length"] == np.random.choice(["short", "medium", "long"], p=[0.4, 0.5, 0.1]):
+            raw_watch_pct2 = base_watch + np.random.normal(0.2, 0.1)
+        else:
+            raw_watch_pct2 = base_watch - np.random.normal(0.3, 0.15)
+        watch_pct2 = np.clip(raw_watch_pct2, 0, 1)
+        
+        interaction2 = {
+            "user_id": user["user_id"],
+            "video_id": video2["video_id"],
+            "watch_percentage": watch_pct2,
+            "liked": 1 if watch_pct2 >= LIKE_THRESHOLD else (1 if watch_pct2 > 0.8 and random.random() < 0.3 else 0),
+            "disliked": 1 if watch_pct2 < MIN_WATCH_FOR_DISLIKE and random.random() < 0.7 else 0,
+            "timestamp": get_weighted_ts(90)
+        }
+        if watch_pct2 >= LIKE_THRESHOLD:
+            interaction2["liked"] = 1
+            interaction2["disliked"] = 0
+        
+        interactions.append(interaction2)
 interactions_df = pd.DataFrame(interactions)
 print("Interactions generated.")
 
 ###############################
 # 5. Save Datasets
 ###############################
-users_df.to_csv("users.csv", index=False)
-channels_df.to_csv("channels.csv", index=False)
-videos_df.to_csv("videos.csv", index=False)
-interactions_df.to_csv("interactions.csv", index=False)
+users_df.to_csv("users2.csv", index=False)
+channels_df.to_csv("channels2.csv", index=False)
+videos_df.to_csv("videos2.csv", index=False)
+interactions_df.to_csv("interactions2.csv", index=False)
 
 print("Synthetic dataset created successfully!")
