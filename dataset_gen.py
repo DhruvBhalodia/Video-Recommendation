@@ -186,8 +186,12 @@ print("Videos generated.")
 followed_probs = [0.5, 0.3, 0.2]
 
 interactions = []
+# Define recency threshold for newly uploaded videos (e.g., within last 7 days)
+RECENCY_THRESHOLD = timedelta(days=7)
+
 # For each user, set a minimum of 50 iterations (yielding at least 100 interactions)
 for user in users:
+    print(user)
     # Get the followed categories for this user (list of 3)
     followed_categories = user["followed_categories"].split(",")
     
@@ -206,7 +210,7 @@ for user in users:
     num_loops = np.random.randint(50, MAX_INTERACTIONS_PER_USER)
     
     for _ in range(num_loops):
-        # --- Interaction 1: Based on Followed Channels ---
+        # --- Interaction 1: Based on Followed Channels with newly uploaded feature ---
         # Randomly choose one followed category for channel-based interaction
         chosen_cat_for_channel = np.random.choice(followed_categories)
         followed_channels = channels_by_cat.get(chosen_cat_for_channel, [])
@@ -216,12 +220,22 @@ for user in users:
                 (videos_df["channel_id"].isin(followed_channels)) &
                 (videos_df["category"] == chosen_cat_for_channel)
             ]
-            if candidate_videos.empty:
-                video1 = videos_df.sample(1).iloc[0]
-            else:
+            # Get current time for recency check
+            now = datetime.now()
+            # Further filter for newly uploaded videos within the recency threshold
+            new_candidate_videos = candidate_videos[
+                candidate_videos["upload_date"].apply(lambda x: (now - x) <= RECENCY_THRESHOLD)
+            ]
+            
+            # Prefer newly uploaded video if available with a probability of 70%
+            if not new_candidate_videos.empty and random.random() < 0.7:
+                video1 = new_candidate_videos.sample(1).iloc[0]
+            elif not candidate_videos.empty:
                 video1 = candidate_videos.sample(1).iloc[0]
+            else:
+                video1 = videos_df.sample(1).iloc[0]
         else:
-            # Fallback: select a video not in the chosen disliked category (if any)
+            # Fallback: select a video from the chosen category
             candidate_videos = videos_df[videos_df["category"] == chosen_cat_for_channel]
             if candidate_videos.empty:
                 video1 = videos_df.sample(1).iloc[0]
@@ -283,9 +297,9 @@ print("Interactions generated.")
 ###############################
 # 5. Save Datasets
 ###############################
-users_df.to_csv("users2.csv", index=False)
-channels_df.to_csv("channels2.csv", index=False)
-videos_df.to_csv("videos2.csv", index=False)
-interactions_df.to_csv("interactions2.csv", index=False)
+users_df.to_csv("users.csv", index=False)
+channels_df.to_csv("channels.csv", index=False)
+videos_df.to_csv("videos.csv", index=False)
+interactions_df.to_csv("interactions.csv", index=False)
 
 print("Synthetic dataset created successfully!")

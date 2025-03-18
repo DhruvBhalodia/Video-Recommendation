@@ -22,23 +22,15 @@ interactions_df['timestamp'] = pd.to_datetime(interactions_df['timestamp'])
 # 2. Users Data Visualizations
 # -------------------------------
 
-# Distribution of preferred categories among users
-plt.figure(figsize=(10, 4))
-sns.countplot(data=users_df, x='preferred_category',
-              order=users_df['preferred_category'].value_counts().index)
-plt.title("Distribution of Preferred Categories (Users)")
-plt.xlabel("Preferred Category")
-plt.ylabel("Count")
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
+# Split the followed_categories into separate rows for analysis
+users_categories = users_df['followed_categories'].str.split(',', expand=True).stack().reset_index(drop=True)
+users_categories_df = pd.DataFrame(users_categories, columns=['category'])
 
-# Distribution of disliked categories among users
 plt.figure(figsize=(10, 4))
-sns.countplot(data=users_df, x='disliked_category',
-              order=users_df['disliked_category'].value_counts().index)
-plt.title("Distribution of Disliked Categories (Users)")
-plt.xlabel("Disliked Category")
+sns.countplot(data=users_categories_df, x='category', 
+              order=users_categories_df['category'].value_counts().index)
+plt.title("Distribution of Followed Categories (Users)")
+plt.xlabel("Category")
 plt.ylabel("Count")
 plt.xticks(rotation=45)
 plt.tight_layout()
