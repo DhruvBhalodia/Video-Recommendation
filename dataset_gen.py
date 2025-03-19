@@ -6,8 +6,6 @@ import random
 
 # Initialize Faker and set seeds for reproducibility
 fake = Faker()
-np.random.seed(42)
-random.seed(42)
 
 # Constants
 NUM_USERS = 1000
